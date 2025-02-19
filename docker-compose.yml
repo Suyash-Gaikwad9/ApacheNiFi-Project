@@ -1,0 +1,20 @@
+version: '3'  # You can remove this line as it's deprecated
+
+services:
+  nifi:
+    image: apache/nifi:1.23.2  # Or your specific tag
+    ports:
+      - "8443:8443"  # Only map HTTPS port 8443
+    volumes:
+      - ./data:/data
+    environment:
+      - NIFI_SECURITY_ENABLED=false # Disable security
+
+  spark:
+    image: bitnami/spark:3.5.0  # Or your specific tag
+    volumes:
+      - ./spark:/app
+      - ./data:/data
+    depends_on:
+      - nifi
+    command: sleep infinity
