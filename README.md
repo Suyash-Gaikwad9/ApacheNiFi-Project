@@ -1,291 +1,117 @@
-**I. Project Setup and Docker Compose:**
+```markdown
+# NiFi-Spark Word Count Pipeline (Dockerized)
 
-1.  **Create Project Directory:\
-    > **
+This project demonstrates a simple data pipeline using Apache NiFi for data ingestion and Apache Spark for data processing, all containerized with Docker Compose.  It's designed for educational purposes and showcases the basic integration of NiFi and Spark.
 
-2.  Bash
+## Overview
 
-mkdir simple-project \# Creates the project directory
+The pipeline performs a word count on text data.  NiFi generates the text data and places it in a shared directory. Spark then reads the data from this directory, performs the word count, and prints the results.
 
-cd simple-project \# Navigates into the directory
+## Prerequisites
 
-3.  
+*   Docker Desktop (or Docker Engine) installed and running
+*   A text editor (e.g., VS Code, Sublime Text, Atom)
 
-4.  *Explanation:* This sets up the main project folder where all the
-    > configuration files and data will reside.
+## Project Structure
 
-5.  **Create Subdirectories:\
-    > **
+```
+simple-project/
+├── docker-compose.yml       # Docker Compose configuration
+├── spark/
+│   └── wordcount.py        # Spark Python script
+└── data/
+    └── input/             # Directory for NiFi generated files
+```
 
-6.  Bash
+## Setup and Execution
 
-mkdir spark data \# Creates subdirectories for Spark scripts and data
+1.  **Clone the Repository (If applicable):**
 
-mkdir data/input \# Creates the input directory for NiFi
+    ```bash
+    git clone <repository_url>
+    cd simple-project
+    ```
 
-7.  
+2.  **Start Docker Containers:**
 
-8.  *Explanation:* spark will hold your Python Spark script, and
-    > data/input will be where NiFi places the generated files.
+    ```bash
+    docker-compose up -d
+    ```
 
-9.  **Create** docker-compose.yml**:\
-    > **
+3.  **Access NiFi UI:**
 
-10. Bash
+    Open your web browser and go to `https://localhost:8443`. Accept the security warning (this is a self-signed certificate for local testing).
 
-touch docker-compose.yml \# Creates an empty docker-compose.yml file
+4.  **Configure NiFi Flow:**
 
-vim docker-compose.yml \# Opens the file in the vim editor (or use your
-preferred editor)
+    *   Drag and drop two processors: `GenerateFlowFile` and `PutFile`.
+    *   Connect `GenerateFlowFile` to `PutFile`.
+    *   Configure `GenerateFlowFile`:
+        *   Scheduling tab: Set "Run Schedule" (e.g., `30 sec`).
+        *   Properties tab: Set "Custom Text" (e.g., "Hello Spark Hello NiFi Hello Docker").
+        *   Apply.
+    *   Configure `PutFile`:
+        *   Properties tab: Set "Directory" to `/data/input`. Set "Conflict Resolution" to `replace`.
+        *   Apply.
+    *   Start both processors.
 
-11. 
+5.  **Run Spark Job:**
 
-12. *Explanation:* docker-compose.yml is the core configuration file
-    > that defines the services (NiFi and Spark) and their interactions.
+    ```bash
+    docker exec -it simple-project-spark-1 spark-submit /app/wordcount.py
+    ```
 
-13. **Populate** docker-compose.yml**:** Paste the following content
-    > into docker-compose.yml (using vim or your editor):
+    (Replace `simple-project-spark-1` with your Spark container name if different - use `docker ps` to check).
 
-14. YAML
+6.  **View Results:**
 
-version: \'3\' \# Optional, can be removed
+    The word counts will be printed in your terminal.
 
-services:
+## Stopping the Containers
 
-nifi:
-
-image: apache/nifi:1.23.2 \# Or your specific tag
-
-ports:
-
-\- \"8443:8443\" \# Expose HTTPS port for NiFi
-
-volumes:
-
-\- ./data:/data \# Mount data directory
-
-environment:
-
-\- NIFI_SECURITY_ENABLED=false \# Disable security (for this demo only)
-
-spark:
-
-image: bitnami/spark:3.5.0 \# Or your specific tag
-
-volumes:
-
-\- ./spark:/app \# Mount Spark scripts directory
-
-\- ./data:/data \# Mount data directory
-
-depends_on: \# Spark starts after NiFi
-
-\- nifi
-
-command: sleep infinity \# Keeps the Spark container running
-
-15. 
-
-16. *Explanation:* This YAML file defines two services: nifi and spark.
-    > It specifies the Docker images to use, port mappings, volume
-    > mounts, and environment variables. depends_on ensures Spark starts
-    > *after* NiFi.
-
-17. **Create Spark Script (**wordcount.py**):\
-    > **
-
-18. Bash
-
-touch spark/wordcount.py \# Creates the Python script file
-
-vim spark/wordcount.py \# Opens the file in vim (or your editor)
-
-19. 
-
-20. *Explanation:* This creates the Python script that will perform the
-    > word count.
-
-21. **Populate** wordcount.py**:** Paste the following code into
-    > wordcount.py:
-
-22. Python
-
-from pyspark.sql import SparkSession
-
-spark =
-SparkSession.builder.appName(\"SimpleWordCount\").master(\"local\[\*\]\").getOrCreate()
-
-try:
-
-text_files = spark.read.text(\"/data/input/\*\") \# Read files from the
-input directory
-
-words = text_files.selectExpr(\"explode(split(value, \' \')) as word\")
-\# Split lines into words
-
-word_counts = words.groupBy(\"word\").count() \# Count word occurrences
-
-print(\"\\n=== WORD COUNTS ===\")
-
-word_counts.show() \# Display the results
-
-print(\"===================\\n\")
-
-except Exception as e:
-
-print(f\"Error processing data: {e}\")
-
-finally:
-
-spark.stop() \# Stop the Spark session
-
-23. 
-
-24. *Explanation:* This Python script uses Spark to read text files from
-    > the /data/input directory, splits each line into words, counts the
-    > occurrences of each word, and prints the results.
-
-25. **Start Docker Containers:\
-    > **
-
-26. Bash
-
-docker-compose up -d
-
-27. 
-
-28. *Explanation:* This command starts the NiFi and Spark containers in
-    > detached mode (running in the background). The -d flag is
-    > important so your terminal is not blocked.
-
-**II. NiFi Flow Configuration:**
-
-1.  **Access NiFi UI:\
-    > \
-    > ** Open your web browser and go to https://localhost:8443. Accept
-    > the security warning (it\'s safe for this local test).
-
-2.  **Add Processors:\
-    > \
-    > ** Drag and drop two processors onto the canvas: GenerateFlowFile
-    > and PutFile.
-
-3.  **Connect Processors:\
-    > \
-    > ** Drag the connection icon from GenerateFlowFile to PutFile to
-    > create a connection.
-
-4.  **Configure** GenerateFlowFile**:\
-    > **
-
-    -   Right-click -\> Configure.
-
-    -   Scheduling tab: Set \"Run Schedule\" (e.g., 30 sec).
-
-    -   Properties tab: Set \"Custom Text\" (e.g., \"Hello Spark Hello
-        > NiFi Hello Docker\").
-
-    -   Apply.
-
-5.  **Configure** PutFile**:\
-    > **
-
-    -   Right-click -\> Configure.
-
-    -   Properties tab: Set \"Directory\" to /data/input. Set \"Conflict
-        > Resolution\" to replace.
-
-    -   Apply.
-
-6.  **Start Processors:\
-    > \
-    > ** Right-click on each processor -\> Start.
-
-**III. Running Spark Job:**
-
-1.  **Check Data Generation:\
-    > **
-
-2.  Bash
-
-ls data/input \# Check if NiFi is creating files in the input directory
-
-3.  
-
-4.  
-
-5.  **Run Spark Job:\
-    > **
-
-6.  Bash
-
-docker exec -it simple-project-spark-1 spark-submit /app/wordcount.py
-
-7.  
-
-8.  *Explanation:* This command executes the spark-submit command
-    > *inside* the Spark container, running your wordcount.py script.
-    > Replace simple-project-spark-1 with your Spark container name if
-    > it\'s different (use docker ps to check).
-
-9.  **View Results:\
-    > \
-    > ** The word counts will be printed in your terminal.
-
-**IV. Stopping and Restarting:**
-
-1.  **Stop Containers:\
-    > **
-
-2.  Bash
-
+```bash
 docker-compose down
+```
 
-3.  
+## Key Commands
 
-4.  
+*   `docker-compose up -d`: Starts the containers.
+*   `docker-compose down`: Stops the containers.
+*   `docker ps`: Lists running containers.
+*   `docker exec -it <container_name> <command>`: Executes a command inside a container.
+*   `docker-compose logs <service_name>`: Views logs for a service.
 
-5.  **Start Containers (and reload NiFi flow):\
-    > **
+## Code Explanation
 
-6.  Bash
+### `docker-compose.yml`
 
-docker-compose up -d
+This file defines the NiFi and Spark services, their dependencies, port mappings, and volume mounts.  The `NIFI_SECURITY_ENABLED=false` setting disables NiFi security for this demonstration.
 
-7.  
+### `wordcount.py`
 
-8.  After restarting, you\'ll need to re-import the NiFi flow if you
-    > didn\'t save it as a template.
+This Python script uses PySpark to:
 
-**V. Key Commands and Explanations:**
+1.  Read text files from the `/data/input` directory.
+2.  Split each line into words.
+3.  Count the occurrences of each word.
+4.  Print the word counts.
 
--   mkdir: Create directory.
+## Important Notes
 
--   cd: Change directory.
+*   This project is for demonstration and learning purposes.
+*   NiFi security is disabled for simplicity. In a production environment, you *must* configure proper security.
+*   The self-signed certificate used by NiFi is only for local testing.  Do not use it in a production environment.
 
--   touch: Create an empty file.
+## Further Development
 
--   vim (or your editor): Edit a file.
+*   Explore more advanced NiFi processors and Spark transformations.
+*   Implement error handling and logging.
+*   Integrate with other data sources and sinks.
+*   Implement proper security for NiFi and Spark.
 
--   docker-compose up -d: Start Docker containers in detached mode.
+## License
 
--   docker-compose down: Stop and remove Docker containers.
+[Choose a license - e.g., MIT License]
+```
 
--   docker ps: List running Docker containers.
-
--   docker exec -it \<container_name\> \<command\>: Execute a command
-    > inside a Docker container.
-
--   docker-compose logs \<service_name\>: View logs for a Docker Compose
-    > service.
-
--   ls -l: List files and directories with details.
-
--   mv: Move files or directories.
-
--   chmod +x \<file\>: Make a file executable (used for testing file
-    > permissions).
-
-This detailed list should help you practice and demonstrate the NiFi and
-Spark setup effectively. Remember to explain the purpose of each command
-and the configuration files during your demonstration. Good luck!
+This README file provides a good starting point for your GitHub repository.  Remember to replace the placeholders (e.g., `<repository_url>`, `[Choose a license]`) with the correct information.  You can also add more details or sections as needed.
